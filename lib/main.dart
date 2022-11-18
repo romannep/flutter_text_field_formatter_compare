@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_text_field_formatter_compare/textFields.dart';
+import 'package:flutter_text_field_formatter_compare/textFieldsMasked.dart';
+import 'package:flutter_text_field_formatter_compare/textFieldsSeparated.dart';
 
 void main() {
   runApp(const MyApp());
@@ -79,7 +80,13 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
-        child: TextFields(),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            TextFieldsSeparated(),
+            TextFieldsMasked(),
+          ],
+        ),
       ),
     );
   }
