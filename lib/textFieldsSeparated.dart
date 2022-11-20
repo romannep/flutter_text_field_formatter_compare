@@ -115,6 +115,7 @@ class TextfieldsSeparatedState extends State<TextFieldsSeparated> {
           Text('Type numbers:'),
           TextFieldEnhanced(
             separateThousands: true,
+            separator: '\'',
             controller: controller,
             inputFormatters: <TextInputFormatter>[
               FilteringTextInputFormatter.digitsOnly

@@ -4,12 +4,11 @@ import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle;
 
 import 'package:flutter/services.dart';
 
-const spacer = 10.0;
-
+// TODO: check migration with global key
 // TODO: take in account numbers after dot
 // TODO: calc separator character width
 
-List<TextSpan> separateTextByThousands(String text) {
+List<TextSpan> separateTextByThousands(String text, double spacerWidth) {
   if (text == '') {
     return [];
   }
@@ -20,7 +19,7 @@ List<TextSpan> separateTextByThousands(String text) {
     if (i % 3 == remainder) {
       spans.add(TextSpan(
         text: text[i],
-        style: TextStyle(letterSpacing: spacer),
+        style: TextStyle(letterSpacing: spacerWidth),
       ));
     } else {
       spans.add(TextSpan(text: text[i]));
@@ -32,10 +31,21 @@ List<TextSpan> separateTextByThousands(String text) {
 
 class TextEditingControllerEnhanced extends TextEditingController {
   final bool separateThousands;
+  final String separator;
+  TextStyle textFieldStyle;
+  late final double spacerWidth;
+
   TextEditingControllerEnhanced({
     String? text,
+    required this.textFieldStyle,
     required this.separateThousands,
-  }) : super(text: text);
+    required this.separator,
+  }) : super(text: text) {
+    final TextPainter textPainter = TextPainter(
+        text: TextSpan(text: separator, style: textFieldStyle), maxLines: 1, textDirection: TextDirection.ltr)
+      ..layout(minWidth: 0, maxWidth: double.infinity);
+    spacerWidth = textPainter.width;
+  }
 
   @override
   TextSpan buildTextSpan(
@@ -45,22 +55,26 @@ class TextEditingControllerEnhanced extends TextEditingController {
     assert(!value.composing.isValid ||
         !withComposing ||
         value.isComposingRangeValid);
+
+    final _style = textFieldStyle.merge(style);
     // If the composing range is out of range for the current text, ignore it to
     // preserve the tree integrity, otherwise in release mode a RangeError will
     // be thrown and this EditableText will be built with a broken subtree.
     if (!value.isComposingRangeValid || !withComposing) {
-      return TextSpan(style: style, children: separateTextByThousands(text));
+      return TextSpan(style: _style, children: separateTextByThousands(text, spacerWidth));
     }
     final TextStyle composingStyle =
-        style?.merge(const TextStyle(decoration: TextDecoration.underline)) ??
-            const TextStyle(decoration: TextDecoration.underline);
+        _style.merge(const TextStyle(decoration: TextDecoration.underline));
     return TextSpan(
-      style: style,
+      style: _style,
       children: <TextSpan>[
         TextSpan(text: value.composing.textBefore(value.text)),
         TextSpan(
           style: composingStyle,
-          children: separateTextByThousands(value.composing.textInside(value.text)),
+          children: separateTextByThousands(
+            value.composing.textInside(value.text),
+            spacerWidth,
+          ),
         ),
         TextSpan(text: value.composing.textAfter(value.text)),
       ],
@@ -68,13 +82,15 @@ class TextEditingControllerEnhanced extends TextEditingController {
   }
 }
 
-class TextFieldEnhanced extends StatefulWidget {
+class TextFieldEnhanced extends StatelessWidget {
 
   final bool separateThousands;
+  final String separator;
 
   TextFieldEnhanced({
     // TextFieldEnhanced properties
     this.separateThousands = false,
+    this.separator = ' ',
     // TextField properties
     super.key,
     this.controller,
@@ -130,7 +146,9 @@ class TextFieldEnhanced extends StatefulWidget {
     this.restorationId,
     this.scribbleEnabled = true,
     this.enableIMEPersonalizedLearning = true,
-  });
+  }) {
+    assert(separator.length == 1, 'Separator should be a single character.');
+  }
 
   final TextEditingController? controller;
   final FocusNode? focusNode;
@@ -188,20 +206,43 @@ class TextFieldEnhanced extends StatefulWidget {
   final bool enableIMEPersonalizedLearning;
 
   @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextStyle effectiveStyle = theme.textTheme.subtitle1!.merge(style);
+
+    return _TextFieldEnhancedWidget(
+      parent: this,
+      style: effectiveStyle,
+    );
+  }
+}
+
+class _TextFieldEnhancedWidget extends StatefulWidget {
+  final TextFieldEnhanced parent;
+  final TextStyle style;
+
+  _TextFieldEnhancedWidget({
+    required this.parent,
+    required this.style,
+  });
+
+  @override
   State<StatefulWidget> createState() => _TextFieldEnhancedState();
 }
 
-class _TextFieldEnhancedState extends State<TextFieldEnhanced> {
+class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
   late final TextEditingController _controller;
 
   initState() {
     _controller = TextEditingControllerEnhanced(
-      text: widget.controller != null ? widget.controller!.text : null,
-      separateThousands: widget.separateThousands,
+      text: widget.parent.controller != null ? widget.parent.controller!.text : null,
+      separateThousands: widget.parent.separateThousands,
+      separator: widget.parent.separator,
+      textFieldStyle: widget.style,
     );
-    if (widget.controller != null) {
+    if (widget.parent.controller != null) {
       _controller.addListener(() {
-        widget.controller!.value = _controller.value;
+        widget.parent.controller!.value = _controller.value;
       });
     }
     super.initState();
@@ -211,58 +252,58 @@ class _TextFieldEnhancedState extends State<TextFieldEnhanced> {
   Widget build(BuildContext context) {
     return TextField(
       controller: _controller,
-      focusNode: widget.focusNode,
-      decoration: widget.decoration,
-      keyboardType: widget.keyboardType,
-      textInputAction: widget.textInputAction,
-      textCapitalization: widget.textCapitalization,
+      focusNode: widget.parent.focusNode,
+      decoration: widget.parent.decoration,
+      keyboardType: widget.parent.keyboardType,
+      textInputAction: widget.parent.textInputAction,
+      textCapitalization: widget.parent.textCapitalization,
       style: widget.style,
-      strutStyle: widget.strutStyle,
-      textAlign: widget.textAlign,
-      textAlignVertical: widget.textAlignVertical,
-      textDirection: widget.textDirection,
-      readOnly: widget.readOnly,
-      toolbarOptions: widget.toolbarOptions,
-      showCursor: widget.showCursor,
-      autofocus: widget.autofocus,
-      obscuringCharacter: widget.obscuringCharacter,
-      obscureText: widget.obscureText,
-      autocorrect: widget.autocorrect,
-      smartDashesType: widget.smartDashesType,
-      smartQuotesType: widget.smartQuotesType,
-      enableSuggestions: widget.enableSuggestions,
-      maxLines: widget.maxLines,
-      minLines: widget.minLines,
-      expands: widget.expands,
-      maxLength: widget.maxLength,
-      maxLengthEnforcement: widget.maxLengthEnforcement,
-      onChanged: widget.onChanged,
-      onEditingComplete: widget.onEditingComplete,
-      onSubmitted: widget.onSubmitted,
-      onAppPrivateCommand: widget.onAppPrivateCommand,
-      inputFormatters: widget.inputFormatters,
-      enabled: widget.enabled,
-      cursorWidth: widget.cursorWidth,
-      cursorHeight: widget.cursorHeight,
-      cursorRadius: widget.cursorRadius,
-      cursorColor: widget.cursorColor,
-      selectionHeightStyle: widget.selectionHeightStyle,
-      selectionWidthStyle: widget.selectionWidthStyle,
-      keyboardAppearance: widget.keyboardAppearance,
-      scrollPadding: widget.scrollPadding,
-      dragStartBehavior: widget.dragStartBehavior,
-      enableInteractiveSelection: widget.enableInteractiveSelection,
-      selectionControls: widget.selectionControls,
-      onTap: widget.onTap,
-      mouseCursor: widget.mouseCursor,
-      buildCounter: widget.buildCounter,
-      scrollController: widget.scrollController,
-      scrollPhysics: widget.scrollPhysics,
-      autofillHints: widget.autofillHints,
-      clipBehavior: widget.clipBehavior,
-      restorationId: widget.restorationId,
-      scribbleEnabled: widget.scribbleEnabled,
-      enableIMEPersonalizedLearning: widget.enableIMEPersonalizedLearning,
+      strutStyle: widget.parent.strutStyle,
+      textAlign: widget.parent.textAlign,
+      textAlignVertical: widget.parent.textAlignVertical,
+      textDirection: widget.parent.textDirection,
+      readOnly: widget.parent.readOnly,
+      toolbarOptions: widget.parent.toolbarOptions,
+      showCursor: widget.parent.showCursor,
+      autofocus: widget.parent.autofocus,
+      obscuringCharacter: widget.parent.obscuringCharacter,
+      obscureText: widget.parent.obscureText,
+      autocorrect: widget.parent.autocorrect,
+      smartDashesType: widget.parent.smartDashesType,
+      smartQuotesType: widget.parent.smartQuotesType,
+      enableSuggestions: widget.parent.enableSuggestions,
+      maxLines: widget.parent.maxLines,
+      minLines: widget.parent.minLines,
+      expands: widget.parent.expands,
+      maxLength: widget.parent.maxLength,
+      maxLengthEnforcement: widget.parent.maxLengthEnforcement,
+      onChanged: widget.parent.onChanged,
+      onEditingComplete: widget.parent.onEditingComplete,
+      onSubmitted: widget.parent.onSubmitted,
+      onAppPrivateCommand: widget.parent.onAppPrivateCommand,
+      inputFormatters: widget.parent.inputFormatters,
+      enabled: widget.parent.enabled,
+      cursorWidth: widget.parent.cursorWidth,
+      cursorHeight: widget.parent.cursorHeight,
+      cursorRadius: widget.parent.cursorRadius,
+      cursorColor: widget.parent.cursorColor,
+      selectionHeightStyle: widget.parent.selectionHeightStyle,
+      selectionWidthStyle: widget.parent.selectionWidthStyle,
+      keyboardAppearance: widget.parent.keyboardAppearance,
+      scrollPadding: widget.parent.scrollPadding,
+      dragStartBehavior: widget.parent.dragStartBehavior,
+      enableInteractiveSelection: widget.parent.enableInteractiveSelection,
+      selectionControls: widget.parent.selectionControls,
+      onTap: widget.parent.onTap,
+      mouseCursor: widget.parent.mouseCursor,
+      buildCounter: widget.parent.buildCounter,
+      scrollController: widget.parent.scrollController,
+      scrollPhysics: widget.parent.scrollPhysics,
+      autofillHints: widget.parent.autofillHints,
+      clipBehavior: widget.parent.clipBehavior,
+      restorationId: widget.parent.restorationId,
+      scribbleEnabled: widget.parent.scribbleEnabled,
+      enableIMEPersonalizedLearning: widget.parent.enableIMEPersonalizedLearning,
     );
   }
 }
