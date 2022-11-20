@@ -4,26 +4,63 @@ import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle;
 
 import 'package:flutter/services.dart';
 
+const spacer = 10.0;
+
+// TODO: take in account numbers after dot
+// TODO: calc separator character width
+
+List<TextSpan> separateTextByThousands(String text) {
+  if (text == '') {
+    return [];
+  }
+  List<TextSpan> spans = [];
+  final int remainder = (text.length - 1) % 3;
+  spans.add(TextSpan(text: text[text.length - 1]));
+  for (int i = text.length - 2; i > -1; i--) {
+    if (i % 3 == remainder) {
+      spans.add(TextSpan(
+        text: text[i],
+        style: TextStyle(letterSpacing: spacer),
+      ));
+    } else {
+      spans.add(TextSpan(text: text[i]));
+    }
+  }
+
+  return spans.reversed.toList();
+}
+
 class TextEditingControllerEnhanced extends TextEditingController {
+  final bool separateThousands;
+  TextEditingControllerEnhanced({
+    String? text,
+    required this.separateThousands,
+  }) : super(text: text);
 
   @override
-  TextSpan buildTextSpan({required BuildContext context, TextStyle? style , required bool withComposing}) {
-    assert(!value.composing.isValid || !withComposing || value.isComposingRangeValid);
+  TextSpan buildTextSpan(
+      {required BuildContext context,
+      TextStyle? style,
+      required bool withComposing, }) {
+    assert(!value.composing.isValid ||
+        !withComposing ||
+        value.isComposingRangeValid);
     // If the composing range is out of range for the current text, ignore it to
     // preserve the tree integrity, otherwise in release mode a RangeError will
     // be thrown and this EditableText will be built with a broken subtree.
     if (!value.isComposingRangeValid || !withComposing) {
-      return TextSpan(style: style, text: text);
+      return TextSpan(style: style, children: separateTextByThousands(text));
     }
-    final TextStyle composingStyle = style?.merge(const TextStyle(decoration: TextDecoration.underline))
-        ?? const TextStyle(decoration: TextDecoration.underline);
+    final TextStyle composingStyle =
+        style?.merge(const TextStyle(decoration: TextDecoration.underline)) ??
+            const TextStyle(decoration: TextDecoration.underline);
     return TextSpan(
       style: style,
       children: <TextSpan>[
         TextSpan(text: value.composing.textBefore(value.text)),
         TextSpan(
           style: composingStyle,
-          text: value.composing.textInside(value.text),
+          children: separateTextByThousands(value.composing.textInside(value.text)),
         ),
         TextSpan(text: value.composing.textAfter(value.text)),
       ],
@@ -32,61 +69,67 @@ class TextEditingControllerEnhanced extends TextEditingController {
 }
 
 class TextFieldEnhanced extends StatefulWidget {
+
+  final bool separateThousands;
+
   TextFieldEnhanced({
-  super.key,
-  this.controller,
-  this.focusNode,
-  this.decoration = const InputDecoration(),
-  this.keyboardType,
-  this.textInputAction,
-  this.textCapitalization = TextCapitalization.none,
-  this.style,
-  this.strutStyle,
-  this.textAlign = TextAlign.start,
-  this.textAlignVertical,
-  this.textDirection,
-  this.readOnly = false,
-  this.toolbarOptions,
-  this.showCursor,
-  this.autofocus = false,
-  this.obscuringCharacter = '•',
-  this.obscureText = false,
-  this.autocorrect = true,
-  this.smartDashesType,
-  this.smartQuotesType,
-  this.enableSuggestions = true,
-  this.maxLines = 1,
-  this.minLines,
-  this.expands = false,
-  this.maxLength,
-  this.maxLengthEnforcement,
-  this.onChanged,
-  this.onEditingComplete,
-  this.onSubmitted,
-  this.onAppPrivateCommand,
-  this.inputFormatters,
-  this.enabled,
-  this.cursorWidth = 2.0,
-  this.cursorHeight,
-  this.cursorRadius,
-  this.cursorColor,
-  this.selectionHeightStyle = ui.BoxHeightStyle.tight,
-  this.selectionWidthStyle = ui.BoxWidthStyle.tight,
-  this.keyboardAppearance,
-  this.scrollPadding = const EdgeInsets.all(20.0),
-  this.dragStartBehavior = DragStartBehavior.start,
-  this.enableInteractiveSelection,
-  this.selectionControls,
-  this.onTap,
-  this.mouseCursor,
-  this.buildCounter,
-  this.scrollController,
-  this.scrollPhysics,
-  this.autofillHints = const <String>[],
-  this.clipBehavior = Clip.hardEdge,
-  this.restorationId,
-  this.scribbleEnabled = true,
-  this.enableIMEPersonalizedLearning = true,
+    // TextFieldEnhanced properties
+    this.separateThousands = false,
+    // TextField properties
+    super.key,
+    this.controller,
+    this.focusNode,
+    this.decoration = const InputDecoration(),
+    this.keyboardType,
+    this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
+    this.style,
+    this.strutStyle,
+    this.textAlign = TextAlign.start,
+    this.textAlignVertical,
+    this.textDirection,
+    this.readOnly = false,
+    this.toolbarOptions,
+    this.showCursor,
+    this.autofocus = false,
+    this.obscuringCharacter = '•',
+    this.obscureText = false,
+    this.autocorrect = true,
+    this.smartDashesType,
+    this.smartQuotesType,
+    this.enableSuggestions = true,
+    this.maxLines = 1,
+    this.minLines,
+    this.expands = false,
+    this.maxLength,
+    this.maxLengthEnforcement,
+    this.onChanged,
+    this.onEditingComplete,
+    this.onSubmitted,
+    this.onAppPrivateCommand,
+    this.inputFormatters,
+    this.enabled,
+    this.cursorWidth = 2.0,
+    this.cursorHeight,
+    this.cursorRadius,
+    this.cursorColor,
+    this.selectionHeightStyle = ui.BoxHeightStyle.tight,
+    this.selectionWidthStyle = ui.BoxWidthStyle.tight,
+    this.keyboardAppearance,
+    this.scrollPadding = const EdgeInsets.all(20.0),
+    this.dragStartBehavior = DragStartBehavior.start,
+    this.enableInteractiveSelection,
+    this.selectionControls,
+    this.onTap,
+    this.mouseCursor,
+    this.buildCounter,
+    this.scrollController,
+    this.scrollPhysics,
+    this.autofillHints = const <String>[],
+    this.clipBehavior = Clip.hardEdge,
+    this.restorationId,
+    this.scribbleEnabled = true,
+    this.enableIMEPersonalizedLearning = true,
   });
 
   final TextEditingController? controller;
@@ -149,12 +192,13 @@ class TextFieldEnhanced extends StatefulWidget {
 }
 
 class _TextFieldEnhancedState extends State<TextFieldEnhanced> {
-
   late final TextEditingController _controller;
 
   initState() {
-
-    _controller = TextEditingControllerEnhanced();
+    _controller = TextEditingControllerEnhanced(
+      text: widget.controller != null ? widget.controller!.text : null,
+      separateThousands: widget.separateThousands,
+    );
     if (widget.controller != null) {
       _controller.addListener(() {
         widget.controller!.value = _controller.value;
@@ -221,5 +265,4 @@ class _TextFieldEnhancedState extends State<TextFieldEnhanced> {
       enableIMEPersonalizedLearning: widget.enableIMEPersonalizedLearning,
     );
   }
-
 }
