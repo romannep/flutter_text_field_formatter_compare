@@ -31,8 +31,9 @@ class TextfieldsMaskedState extends State<TextFieldsMasked> {
             style: TextStyle(fontSize: 25),
           ),
           marginWidget,
-          textWithLink('Mask through insert character through inputFormatter (mask_text_input_formatter) (type numbers)',
+          textWithLink('Mask through insert character through inputFormatter (mask_text_input_formatter)',
               'https://pub.dev/packages/mask_text_input_formatter'),
+          Text('Type numbers:'),
           TextField(
             keyboardType: TextInputType.number,
             inputFormatters: [maskFormatter],

@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_text_field_formatter_compare/TextFieldEnhanced.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const marginWidget = SizedBox(height: 20);
@@ -79,6 +80,17 @@ class TextFieldsSeparated extends StatefulWidget {
 }
 
 class TextfieldsSeparatedState extends State<TextFieldsSeparated> {
+
+  final controller = TextEditingController();
+
+  @override
+  void initState() {
+    controller.addListener(() {
+      print('text is: ${controller.text}');
+    });
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -93,9 +105,20 @@ class TextfieldsSeparatedState extends State<TextFieldsSeparated> {
           marginWidget,
           textWithLink('Insert character through inputFormatter',
               'https://stackoverflow.com/questions/62821439/thousand-separator-in-flutter'),
+          Text('Type numbers:'),
           TextField(
             keyboardType: TextInputType.number,
             inputFormatters: [ThousandsSeparatorInputFormatter()],
+          ),
+          marginWidget,
+          Text('TextFieldEnhanced'),
+          Text('Type numbers:'),
+          TextFieldEnhanced(
+            controller: controller,
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly
+            ],
+            keyboardType: TextInputType.number,
           ),
         ],
       ),
