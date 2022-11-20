@@ -4,7 +4,6 @@ import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle;
 
 import 'package:flutter/services.dart';
 
-// TODO: check migration with global key
 // TODO: take in account numbers after dot
 // TODO: calc separator character width
 
