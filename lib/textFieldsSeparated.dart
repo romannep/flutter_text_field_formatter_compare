@@ -105,6 +105,7 @@ class TextfieldsSeparatedState extends State<TextFieldsSeparated> {
           marginWidget,
           textWithLink('Insert character through inputFormatter',
               'https://stackoverflow.com/questions/62821439/thousand-separator-in-flutter'),
+          marginWidget,
           Text('Type numbers:'),
           TextField(
             keyboardType: TextInputType.number,
@@ -112,6 +113,7 @@ class TextfieldsSeparatedState extends State<TextFieldsSeparated> {
           ),
           marginWidget,
           Text('TextFieldEnhanced'),
+          marginWidget,
           Text('Type numbers:'),
           TextFieldEnhanced(
             separateThousands: true,

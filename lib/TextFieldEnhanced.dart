@@ -5,9 +5,12 @@ import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle;
 import 'package:flutter/services.dart';
 
 // TODO: take in account numbers after dot
-// TODO: calc separator character width
 
-List<TextSpan> separateTextByThousands(String text, double spacerWidth) {
+List<TextSpan> separateTextByThousands({
+  required String text,
+  double spacerWidth = 0,
+  String separator = '',
+}) {
   if (text == '') {
     return [];
   }
@@ -16,10 +19,15 @@ List<TextSpan> separateTextByThousands(String text, double spacerWidth) {
   spans.add(TextSpan(text: text[text.length - 1]));
   for (int i = text.length - 2; i > -1; i--) {
     if (i % 3 == remainder) {
-      spans.add(TextSpan(
-        text: text[i],
-        style: TextStyle(letterSpacing: spacerWidth),
-      ));
+      if (separator == '') {
+        spans.add(TextSpan(
+          text: text[i],
+          style: TextStyle(letterSpacing: spacerWidth),
+        ));
+      } else {
+        spans.add(TextSpan(text: separator));
+        spans.add(TextSpan(text: text[i]));
+      }
     } else {
       spans.add(TextSpan(text: text[i]));
     }
@@ -28,10 +36,49 @@ List<TextSpan> separateTextByThousands(String text, double spacerWidth) {
   return spans.reversed.toList();
 }
 
+TextSpan _buildTextSpan({
+  required TextEditingValue value,
+  required TextStyle textFieldStyle,
+  TextStyle? style,
+  bool withComposing = false,
+  required String text,
+  double spacerWidth = 0,
+  String separator = '', // will insert separator instead of space
+}) {
+  final _style = textFieldStyle.merge(style);
+
+  if (!value.isComposingRangeValid || !withComposing) {
+    return TextSpan(style: _style, children: separateTextByThousands(
+      text: text,
+      spacerWidth: spacerWidth,
+      separator: separator,
+    ));
+  }
+
+  final TextStyle composingStyle =
+  _style.merge(const TextStyle(decoration: TextDecoration.underline));
+
+  return TextSpan(
+    style: _style,
+    children: <TextSpan>[
+      TextSpan(text: value.composing.textBefore(value.text)),
+      TextSpan(
+        style: composingStyle,
+        children: separateTextByThousands(
+          text: value.composing.textInside(value.text),
+          spacerWidth: spacerWidth,
+          separator: separator,
+        ),
+      ),
+      TextSpan(text: value.composing.textAfter(value.text)),
+    ],
+  );
+}
+
 class TextEditingControllerEnhanced extends TextEditingController {
   final bool separateThousands;
   final String separator;
-  TextStyle textFieldStyle;
+  final TextStyle textFieldStyle;
   late final double spacerWidth;
 
   TextEditingControllerEnhanced({
@@ -55,28 +102,13 @@ class TextEditingControllerEnhanced extends TextEditingController {
         !withComposing ||
         value.isComposingRangeValid);
 
-    final _style = textFieldStyle.merge(style);
-    // If the composing range is out of range for the current text, ignore it to
-    // preserve the tree integrity, otherwise in release mode a RangeError will
-    // be thrown and this EditableText will be built with a broken subtree.
-    if (!value.isComposingRangeValid || !withComposing) {
-      return TextSpan(style: _style, children: separateTextByThousands(text, spacerWidth));
-    }
-    final TextStyle composingStyle =
-        _style.merge(const TextStyle(decoration: TextDecoration.underline));
-    return TextSpan(
-      style: _style,
-      children: <TextSpan>[
-        TextSpan(text: value.composing.textBefore(value.text)),
-        TextSpan(
-          style: composingStyle,
-          children: separateTextByThousands(
-            value.composing.textInside(value.text),
-            spacerWidth,
-          ),
-        ),
-        TextSpan(text: value.composing.textAfter(value.text)),
-      ],
+    return _buildTextSpan(
+      value: value,
+      textFieldStyle: textFieldStyle,
+      text: text,
+      style: style,
+      withComposing: withComposing,
+      spacerWidth: spacerWidth,
     );
   }
 }
@@ -208,6 +240,9 @@ class TextFieldEnhanced extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final TextStyle effectiveStyle = theme.textTheme.subtitle1!.merge(style);
+    final dec = theme.inputDecorationTheme.contentPadding;
+    final ei = EdgeInsets.all(5);
+    print('dec ${ei.resolve(TextDirection.ltr).bottom}');
 
     return _TextFieldEnhancedWidget(
       parent: this,
@@ -239,17 +274,18 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       separator: widget.parent.separator,
       textFieldStyle: widget.style,
     );
-    if (widget.parent.controller != null) {
-      _controller.addListener(() {
+    _controller.addListener(() {
+      if (widget.parent.controller != null) {
         widget.parent.controller!.value = _controller.value;
-      });
-    }
+      }
+      setState(() {});
+    });
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    final textField = TextField(
       controller: _controller,
       focusNode: widget.parent.focusNode,
       decoration: widget.parent.decoration,
@@ -303,6 +339,29 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       restorationId: widget.parent.restorationId,
       scribbleEnabled: widget.parent.scribbleEnabled,
       enableIMEPersonalizedLearning: widget.parent.enableIMEPersonalizedLearning,
+    );
+
+    if (widget.parent.separator == ' ') {
+      return textField;
+    }
+
+
+    return Stack(
+      children: [
+        textField,
+        Positioned(
+          bottom: 14,
+          child: RichText(
+            text: _buildTextSpan(
+              value: _controller.value,
+              textFieldStyle: widget.style,
+              text: _controller.text,
+              style: widget.style,
+              separator: widget.parent.separator,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
