@@ -123,6 +123,10 @@ class TextfieldsSeparatedState extends State<TextFieldsSeparated> {
               FilteringTextInputFormatter.digitsOnly
             ],
             keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              isDense: false,
+              contentPadding: EdgeInsets.all(50),
+            ),
           ),
         ],
       ),

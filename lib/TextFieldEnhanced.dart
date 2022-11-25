@@ -113,6 +113,32 @@ class TextEditingControllerEnhanced extends TextEditingController {
   }
 }
 
+class TextEditingControllerEnhancedMirror extends TextEditingController {
+  final TextStyle textFieldStyle;
+  final String separator;
+
+  TextEditingControllerEnhancedMirror({
+    required this.textFieldStyle,
+    required this.separator,
+  });
+
+  @override
+  TextSpan buildTextSpan(
+      {required BuildContext context,
+        TextStyle? style,
+        required bool withComposing, }) {
+
+    return _buildTextSpan(
+      value: value,
+      textFieldStyle: textFieldStyle,
+      text: text,
+      style: style,
+      withComposing: withComposing,
+      separator: separator,
+    );
+  }
+}
+
 class TextFieldEnhanced extends StatelessWidget {
 
   final bool separateThousands;
@@ -240,9 +266,6 @@ class TextFieldEnhanced extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final TextStyle effectiveStyle = theme.textTheme.subtitle1!.merge(style);
-    final dec = theme.inputDecorationTheme.contentPadding;
-    final ei = EdgeInsets.all(5);
-    print('dec ${ei.resolve(TextDirection.ltr).bottom}');
 
     return _TextFieldEnhancedWidget(
       parent: this,
@@ -266,6 +289,7 @@ class _TextFieldEnhancedWidget extends StatefulWidget {
 
 class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
   late final TextEditingController _controller;
+  late final TextEditingController _controllerMirror;
 
   initState() {
     _controller = TextEditingControllerEnhanced(
@@ -274,10 +298,15 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       separator: widget.parent.separator,
       textFieldStyle: widget.style,
     );
+    _controllerMirror = TextEditingControllerEnhancedMirror(
+      textFieldStyle: widget.style,
+      separator: widget.parent.separator,
+    );
     _controller.addListener(() {
       if (widget.parent.controller != null) {
         widget.parent.controller!.value = _controller.value;
       }
+      _controllerMirror.value = _controller.value;
       setState(() {});
     });
     super.initState();
@@ -345,22 +374,66 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       return textField;
     }
 
+    final textFieldMirror = TextField(
+      controller: _controllerMirror,
+      focusNode: widget.parent.focusNode,
+      decoration: widget.parent.decoration,
+      keyboardType: widget.parent.keyboardType,
+      textInputAction: widget.parent.textInputAction,
+      textCapitalization: widget.parent.textCapitalization,
+      style: TextStyle(color: Colors.red),// widget.style,
+      strutStyle: widget.parent.strutStyle,
+      textAlign: widget.parent.textAlign,
+      textAlignVertical: widget.parent.textAlignVertical,
+      textDirection: widget.parent.textDirection,
+      readOnly: widget.parent.readOnly,
+      toolbarOptions: widget.parent.toolbarOptions,
+      showCursor: widget.parent.showCursor,
+      autofocus: widget.parent.autofocus,
+      obscuringCharacter: widget.parent.obscuringCharacter,
+      obscureText: widget.parent.obscureText,
+      autocorrect: widget.parent.autocorrect,
+      smartDashesType: widget.parent.smartDashesType,
+      smartQuotesType: widget.parent.smartQuotesType,
+      enableSuggestions: widget.parent.enableSuggestions,
+      maxLines: widget.parent.maxLines,
+      minLines: widget.parent.minLines,
+      expands: widget.parent.expands,
+      maxLength: widget.parent.maxLength,
+      maxLengthEnforcement: widget.parent.maxLengthEnforcement,
+      onChanged: widget.parent.onChanged,
+      onEditingComplete: widget.parent.onEditingComplete,
+      onSubmitted: widget.parent.onSubmitted,
+      onAppPrivateCommand: widget.parent.onAppPrivateCommand,
+      inputFormatters: widget.parent.inputFormatters,
+      enabled: widget.parent.enabled,
+      cursorWidth: widget.parent.cursorWidth,
+      cursorHeight: widget.parent.cursorHeight,
+      cursorRadius: widget.parent.cursorRadius,
+      cursorColor: widget.parent.cursorColor,
+      selectionHeightStyle: widget.parent.selectionHeightStyle,
+      selectionWidthStyle: widget.parent.selectionWidthStyle,
+      keyboardAppearance: widget.parent.keyboardAppearance,
+      scrollPadding: widget.parent.scrollPadding,
+      dragStartBehavior: widget.parent.dragStartBehavior,
+      enableInteractiveSelection: widget.parent.enableInteractiveSelection,
+      selectionControls: widget.parent.selectionControls,
+      onTap: widget.parent.onTap,
+      mouseCursor: widget.parent.mouseCursor,
+      buildCounter: widget.parent.buildCounter,
+      scrollController: widget.parent.scrollController,
+      scrollPhysics: widget.parent.scrollPhysics,
+      autofillHints: widget.parent.autofillHints,
+      clipBehavior: widget.parent.clipBehavior,
+      restorationId: widget.parent.restorationId,
+      scribbleEnabled: widget.parent.scribbleEnabled,
+      enableIMEPersonalizedLearning: widget.parent.enableIMEPersonalizedLearning,
+    );
 
     return Stack(
       children: [
+        textFieldMirror,
         textField,
-        Positioned(
-          bottom: 14,
-          child: RichText(
-            text: _buildTextSpan(
-              value: _controller.value,
-              textFieldStyle: widget.style,
-              text: _controller.text,
-              style: widget.style,
-              separator: widget.parent.separator,
-            ),
-          ),
-        ),
       ],
     );
   }
