@@ -116,6 +116,8 @@ class TextfieldsSeparatedState extends State<TextFieldsSeparated> {
           marginWidget,
           Text('Type numbers:'),
           TextFieldEnhanced(
+            textFieldKey: Key('separated_1'),
+            textFieldMirrorKey: Key('separated_1_mirror'),
             separateThousands: true,
             separator: '\'',
             controller: controller,

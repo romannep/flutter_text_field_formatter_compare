@@ -146,6 +146,8 @@ class TextFieldEnhanced extends StatelessWidget {
 
   TextFieldEnhanced({
     // TextFieldEnhanced properties
+    this.textFieldKey,
+    this.textFieldMirrorKey,
     this.separateThousands = false,
     this.separator = ' ',
     // TextField properties
@@ -207,6 +209,8 @@ class TextFieldEnhanced extends StatelessWidget {
     assert(separator.length == 1, 'Separator should be a single character.');
   }
 
+  final Key? textFieldMirrorKey;
+  final Key? textFieldKey;
   final TextEditingController? controller;
   final FocusNode? focusNode;
   final InputDecoration? decoration;
@@ -315,6 +319,7 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
   @override
   Widget build(BuildContext context) {
     final textField = TextField(
+      key: widget.parent.textFieldKey,
       controller: _controller,
       focusNode: widget.parent.focusNode,
       decoration: widget.parent.decoration,
@@ -375,6 +380,7 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
     }
 
     final textFieldMirror = TextField(
+      key: widget.parent.textFieldMirrorKey,
       controller: _controllerMirror,
       focusNode: widget.parent.focusNode,
       decoration: widget.parent.decoration,
