@@ -4,6 +4,8 @@ import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle;
 
 import 'package:flutter/services.dart';
 
+const int _zwjUtf16 = 0x200d;
+
 // TODO: take in account numbers after dot
 
 List<TextSpan> separateTextByThousands({
@@ -31,6 +33,15 @@ List<TextSpan> separateTextByThousands({
     } else {
       spans.add(TextSpan(text: text[i]));
     }
+  }
+
+  // If extra letter space added to first character it also
+  // adds space before character - so mirror text does not match.
+  // In this case zero width symbol added as first.
+  if (separator == '' && text.length > 1 && text.length % 3 == 1) {
+    spans.add(TextSpan(
+      text: String.fromCharCode(_zwjUtf16),
+    ));
   }
 
   return spans.reversed.toList();
@@ -387,7 +398,7 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       keyboardType: widget.parent.keyboardType,
       textInputAction: widget.parent.textInputAction,
       textCapitalization: widget.parent.textCapitalization,
-      style: TextStyle(color: Colors.red),// widget.style,
+      style: widget.style,
       strutStyle: widget.parent.strutStyle,
       textAlign: widget.parent.textAlign,
       textAlignVertical: widget.parent.textAlignVertical,
