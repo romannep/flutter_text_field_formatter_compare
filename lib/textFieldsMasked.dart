@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
-import 'textFieldsSeparated.dart';
+import 'numberTextFields.dart';
 
 
 class TextFieldsMasked extends StatefulWidget {

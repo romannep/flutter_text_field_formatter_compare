@@ -87,7 +87,6 @@ TextSpan _buildTextSpan({
 }
 
 class TextEditingControllerEnhanced extends TextEditingController {
-  final bool separateThousands;
   final String separator;
   final TextStyle textFieldStyle;
   late final double spacerWidth;
@@ -95,7 +94,6 @@ class TextEditingControllerEnhanced extends TextEditingController {
   TextEditingControllerEnhanced({
     String? text,
     required this.textFieldStyle,
-    required this.separateThousands,
     required this.separator,
   }) : super(text: text) {
     final TextPainter textPainter = TextPainter(
@@ -307,12 +305,12 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
   late final TextEditingController _controllerMirror;
 
   initState() {
-    _controller = TextEditingControllerEnhanced(
+    _controller = widget.parent.separateThousands ? TextEditingControllerEnhanced(
       text: widget.parent.controller != null ? widget.parent.controller!.text : null,
-      separateThousands: widget.parent.separateThousands,
       separator: widget.parent.separator,
       textFieldStyle: widget.style,
-    );
+    ) : TextEditingController();
+
     _controllerMirror = TextEditingControllerEnhancedMirror(
       textFieldStyle: widget.style,
       separator: widget.parent.separator,
