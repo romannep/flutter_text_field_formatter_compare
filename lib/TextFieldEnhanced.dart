@@ -152,6 +152,10 @@ class TextFieldEnhanced extends StatelessWidget {
 
   final bool separateThousands;
   final String separator;
+  final bool integer;
+  final bool float;
+  final bool fixedPoint;
+  final int decimalDigits;
 
   TextFieldEnhanced({
     // TextFieldEnhanced properties
@@ -159,6 +163,10 @@ class TextFieldEnhanced extends StatelessWidget {
     this.textFieldMirrorKey,
     this.separateThousands = false,
     this.separator = ' ',
+    this.integer = false,
+    this.float = false,
+    this.fixedPoint = false,
+    this.decimalDigits = 0,
     // TextField properties
     super.key,
     this.controller,
@@ -216,6 +224,7 @@ class TextFieldEnhanced extends StatelessWidget {
     this.enableIMEPersonalizedLearning = true,
   }) {
     assert(separator.length == 1, 'Separator should be a single character.');
+    assert([integer, float, fixedPoint].where((element) => element).length < 2, 'Only one number type allowed');
   }
 
   final Key? textFieldMirrorKey;
@@ -287,6 +296,36 @@ class TextFieldEnhanced extends StatelessWidget {
   }
 }
 
+class NumberFormatter extends TextInputFormatter {
+  final bool integer;
+  final bool float;
+  final bool fixedPoint;
+  final int decimalDigits;
+
+  NumberFormatter({
+    required this.integer,
+    required this.float,
+    required this.fixedPoint,
+    required this.decimalDigits,
+  });
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+
+    if (oldValue.text.length < newValue.text.length) {
+      // inserted
+      print('inserted ${newValue.text[newValue.selection.baseOffset - 1]}');
+    } else if (oldValue.text.length > newValue.text.length) {
+      // deleted
+    } else {
+      // selection change
+    }
+
+    return newValue;
+  }
+}
+
+
 class _TextFieldEnhancedWidget extends StatefulWidget {
   final TextFieldEnhanced parent;
   final TextStyle style;
@@ -303,6 +342,7 @@ class _TextFieldEnhancedWidget extends StatefulWidget {
 class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
   late final TextEditingController _controller;
   late final TextEditingController _controllerMirror;
+  final List<TextInputFormatter> _inputFormatters = [];
 
   initState() {
     _controller = widget.parent.separateThousands ? TextEditingControllerEnhanced(
@@ -310,6 +350,17 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       separator: widget.parent.separator,
       textFieldStyle: widget.style,
     ) : TextEditingController();
+
+    _inputFormatters.addAll(widget.parent.inputFormatters ?? []);
+
+    if (widget.parent.integer || widget.parent.float || widget.parent.fixedPoint) {
+      _inputFormatters.add(NumberFormatter(
+        integer: widget.parent.integer,
+        float: widget.parent.float,
+        fixedPoint: widget.parent.fixedPoint,
+        decimalDigits: widget.parent.decimalDigits
+      ));
+    }
 
     _controllerMirror = TextEditingControllerEnhancedMirror(
       textFieldStyle: widget.style,
@@ -359,7 +410,7 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       onEditingComplete: widget.parent.onEditingComplete,
       onSubmitted: widget.parent.onSubmitted,
       onAppPrivateCommand: widget.parent.onAppPrivateCommand,
-      inputFormatters: widget.parent.inputFormatters,
+      inputFormatters: _inputFormatters,
       enabled: widget.parent.enabled,
       cursorWidth: widget.parent.cursorWidth,
       cursorHeight: widget.parent.cursorHeight,
