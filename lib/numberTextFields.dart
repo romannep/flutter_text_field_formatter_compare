@@ -107,10 +107,11 @@ Full selection copies non numeric data''')),
               children: [
                 Expanded(
                   child: TextFieldEnhanced(
-                    integer: true,
                     decoration: InputDecoration(
                       label: Text('float'),
                     ),
+                    float: true,
+                    signed: true,
                   ),
                 ),
                 marginWidget,
@@ -119,6 +120,9 @@ Full selection copies non numeric data''')),
                     decoration: InputDecoration(
                       label: Text('fixed point'),
                     ),
+                    fixedPoint: true,
+                    signed: true,
+                    decimalDigits: 2,
                   ),
                 ),
               ],

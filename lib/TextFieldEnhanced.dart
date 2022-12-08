@@ -156,6 +156,7 @@ class TextFieldEnhanced extends StatelessWidget {
   final bool float;
   final bool fixedPoint;
   final int decimalDigits;
+  final bool signed;
 
   TextFieldEnhanced({
     // TextFieldEnhanced properties
@@ -167,6 +168,7 @@ class TextFieldEnhanced extends StatelessWidget {
     this.float = false,
     this.fixedPoint = false,
     this.decimalDigits = 0,
+    this.signed = false,
     // TextField properties
     super.key,
     this.controller,
@@ -296,29 +298,136 @@ class TextFieldEnhanced extends StatelessWidget {
   }
 }
 
+TextEditingValue addZeroBeforeDelimiter(TextEditingValue value, String delimiter) {
+  if (value.text.indexOf(delimiter) == -1) {
+    return value;
+  }
+  // assuming that selection offset is greater than delimiter position
+  if (value.text.startsWith('-')) {
+    if (value.text[1] == delimiter) {
+      return TextEditingValue(
+        text: '-0' + value.text.replaceAll('-', ''),
+        selection: TextSelection(
+          baseOffset: value.selection.baseOffset + 1,
+          extentOffset: value.selection.baseOffset + 1,
+        ),
+      );
+    } else {
+      return value;
+    }
+  } else {
+    if (value.text.startsWith(delimiter)) {
+      return TextEditingValue(
+        text: '0' + value.text,
+        selection: TextSelection(
+          baseOffset: value.selection.baseOffset + 1,
+          extentOffset: value.selection.baseOffset + 1,
+        ),
+      );
+    } else {
+      return value;
+    }
+  }
+}
+
+
+
 class NumberFormatter extends TextInputFormatter {
   final bool integer;
   final bool float;
   final bool fixedPoint;
   final int decimalDigits;
+  final bool signed;
+  final String delimiter;
+  String allowedChars = '0123456789';
 
   NumberFormatter({
     required this.integer,
     required this.float,
     required this.fixedPoint,
     required this.decimalDigits,
-  });
-
+    required this.signed,
+    this.delimiter = '.',
+  }) {
+    if (signed) {
+      allowedChars += '-';
+    }
+    if (float || fixedPoint) {
+      allowedChars += delimiter;
+    }
+  }
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return addZeroBeforeDelimiter(_formatEditUpdateNumber(oldValue, newValue), delimiter);
+  }
 
-    if (oldValue.text.length < newValue.text.length) {
-      // inserted
+  TextEditingValue _formatEditUpdateNumber(TextEditingValue oldValue, TextEditingValue newValue) {
+
+    if (oldValue.text.length - newValue.text.length == -1) {
+      // 1 character inserted
       print('inserted ${newValue.text[newValue.selection.baseOffset - 1]}');
-    } else if (oldValue.text.length > newValue.text.length) {
-      // deleted
+      final insertedChar = newValue.text[newValue.selection.baseOffset - 1];
+      if (allowedChars.indexOf(insertedChar) == -1 ) {
+        return oldValue;
+      }
+
+      if (insertedChar == '-') {
+        if (oldValue.text.length > 0 && oldValue.text[0] == '-') {
+          return TextEditingValue(
+            text: oldValue.text.substring(1),
+            selection: TextSelection(
+              baseOffset: oldValue.selection.baseOffset - 1,
+              extentOffset: oldValue.selection.baseOffset - 1,
+            ),
+          );
+        } else {
+          return TextEditingValue(
+            text: '-' + oldValue.text,
+            selection: TextSelection(
+              baseOffset: oldValue.selection.baseOffset + 1,
+              extentOffset: oldValue.selection.baseOffset + 1,
+            ),
+          );
+        }
+      }
+
+
+      // trim leading zeros after move delimiter (also for in 1000001 - rm first)
+      // add 0. if placind delimiter at start
+
+      if (insertedChar == delimiter && float) {
+        if (oldValue.text[0] == '-' && newValue.text[0] == delimiter) {
+          return oldValue;
+        }
+
+        if (oldValue.text.indexOf(delimiter) == -1) {
+          return newValue;
+        }
+
+        final bool newDelimiterPlacedAfterExisting = oldValue.selection.baseOffset >= oldValue.text.indexOf(delimiter);
+        final fixedValue = oldValue.text.replaceAll(delimiter, '');
+        final int newDelimiterPosition = newDelimiterPlacedAfterExisting ? oldValue.selection.baseOffset -1 : oldValue.selection.baseOffset;
+
+        return TextEditingValue(
+          text: fixedValue.substring(0, newDelimiterPosition) + delimiter + fixedValue.substring(newDelimiterPosition),
+          selection: TextSelection(
+            baseOffset: newDelimiterPosition + 1,
+            extentOffset: newDelimiterPosition + 1,
+          ),
+        );
+      } else if (insertedChar == delimiter && fixedPoint) {
+        // todo: move to decimals
+
+        return oldValue;
+      }
+
+      // here only numbers are possible
+
+      return newValue; // TODO: remove me
+    } else if (oldValue.text.length - newValue.text.length == 1) {
+      // 1 character deleted
     } else {
-      // selection change
+      // copy/paste/bulk/selection change
     }
 
     return newValue;
@@ -358,7 +467,8 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
         integer: widget.parent.integer,
         float: widget.parent.float,
         fixedPoint: widget.parent.fixedPoint,
-        decimalDigits: widget.parent.decimalDigits
+        decimalDigits: widget.parent.decimalDigits,
+        signed: widget.parent.signed,
       ));
     }
 
