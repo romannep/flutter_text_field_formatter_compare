@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 const int _zwjUtf16 = 0x200d;
 
 // TODO: take in account numbers after dot
+// TODO: fix kerning problem
 
 List<TextSpan> separateTextByThousands({
   required String text,
@@ -157,6 +158,7 @@ class TextFieldEnhanced extends StatelessWidget {
   final bool fixedPoint;
   final int decimalDigits;
   final bool signed;
+  final bool initialZero;
 
   TextFieldEnhanced({
     // TextFieldEnhanced properties
@@ -169,6 +171,7 @@ class TextFieldEnhanced extends StatelessWidget {
     this.fixedPoint = false,
     this.decimalDigits = 0,
     this.signed = false,
+    this.initialZero = false,
     // TextField properties
     super.key,
     this.controller,
@@ -298,8 +301,19 @@ class TextFieldEnhanced extends StatelessWidget {
   }
 }
 
-TextEditingValue addZeroBeforeDelimiter(TextEditingValue value, String delimiter) {
+TextEditingValue addZeroIfNeed(TextEditingValue value, String delimiter) {
   if (value.text.indexOf(delimiter) == -1) {
+    if ((value.text.startsWith('-') && value.text.length == 1)
+    || (value.text.length == 0)) {
+      return TextEditingValue(
+        text: value.text + '0',
+        selection: TextSelection(
+          baseOffset: value.selection.baseOffset + 1,
+          extentOffset: value.selection.baseOffset + 1,
+        ),
+      );
+    }
+
     return value;
   }
   // assuming that selection offset is greater than delimiter position
@@ -331,6 +345,49 @@ TextEditingValue addZeroBeforeDelimiter(TextEditingValue value, String delimiter
 }
 
 
+TextEditingValue removeExtraLeadingZeros(TextEditingValue value, String delimiter) {
+  // 1|000. -> |000. -> 0|.
+  // 1|000 -> |000 -> 0|
+  // 0 -> 00| -> 0|
+  // 0.|001 -> 0|001 -> 1|
+  // 1|001 -> |001 -> 1|  // |1 is logic, but in case 0 -> 01 we get weird result
+  final text = value.text;
+  int extraZerosStart = -1;
+  int extraZerosCount = 0;
+  int i = 0;
+  for (; i < text.length; i++) {
+    final character = text[i];
+    if (character == '-') {
+      continue;
+    }
+    if (character != '0') {
+      break;
+    }
+    extraZerosCount++;
+    if (extraZerosStart == -1) {
+      extraZerosStart = i;
+    }
+  }
+
+  if (i-1 == text.length - 1) {
+    extraZerosCount--;
+  } else if (text[i] == delimiter) {
+      extraZerosCount--;
+  }
+
+  if (extraZerosCount > 0) {
+    return TextEditingValue(
+      text: text.substring(0, extraZerosStart) + text.substring(extraZerosStart + extraZerosCount),
+      selection: TextSelection(
+        baseOffset: extraZerosStart + 1,
+        extentOffset: extraZerosStart + 1,
+      ),
+    );
+  } else {
+    return value;
+  }
+}
+
 
 class NumberFormatter extends TextInputFormatter {
   final bool integer;
@@ -358,7 +415,7 @@ class NumberFormatter extends TextInputFormatter {
   }
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    return addZeroBeforeDelimiter(_formatEditUpdateNumber(oldValue, newValue), delimiter);
+    return removeExtraLeadingZeros(addZeroIfNeed(_formatEditUpdateNumber(oldValue, newValue), delimiter), delimiter);
   }
 
   TextEditingValue _formatEditUpdateNumber(TextEditingValue oldValue, TextEditingValue newValue) {
@@ -463,6 +520,9 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
     _inputFormatters.addAll(widget.parent.inputFormatters ?? []);
 
     if (widget.parent.integer || widget.parent.float || widget.parent.fixedPoint) {
+      if (widget.parent.initialZero && _controller.text == '') {
+        _controller.text = '0';
+      }
       _inputFormatters.add(NumberFormatter(
         integer: widget.parent.integer,
         float: widget.parent.float,
