@@ -4,11 +4,13 @@ import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle;
 
 import 'package:flutter/services.dart';
 
-const int _zwjUtf16 = 0x200d;
-
+// TODO: floating label with separator
+// TODO: copy/paste
 // TODO: take in account numbers after dot
 // TODO: fix kerning problem
 
+const int _zwjUtf16 = 0x200d;
+final String _zeroWidthCharacter = String.fromCharCode(_zwjUtf16);
 List<TextSpan> separateTextByThousands({
   required String text,
   double spacerWidth = 0,
@@ -39,13 +41,33 @@ List<TextSpan> separateTextByThousands({
   // If extra letter space added to first character it also
   // adds space before character - so mirror text does not match.
   // In this case zero width symbol added as first.
-  if (separator == '' && text.length > 1 && text.length % 3 == 1) {
-    spans.add(TextSpan(
-      text: String.fromCharCode(_zwjUtf16),
-    ));
-  }
 
   return spans.reversed.toList();
+}
+
+const NUMBERS = '0123456789';
+
+List<String> _extractIntegerPart(String text) {
+  final List<String> parts = [_zeroWidthCharacter,'',''];
+  if (text.length < 2) {
+    return parts;
+  }
+  int i = 1;
+  if (text[1] == '-') {
+    parts[1] += '-';
+    i++;
+  }
+  for (; i < text.length; i++) {
+    if (NUMBERS.contains(text[i])) {
+      parts[1] += text[i];
+    } else {
+      break;
+    }
+  }
+  if (i < text.length) {
+    parts[2] = text.substring(i);
+  }
+  return parts;
 }
 
 TextSpan _buildTextSpan({
@@ -60,15 +82,24 @@ TextSpan _buildTextSpan({
   final _style = textFieldStyle.merge(style);
 
   if (!value.isComposingRangeValid || !withComposing) {
-    return TextSpan(style: _style, children: separateTextByThousands(
-      text: text,
-      spacerWidth: spacerWidth,
-      separator: separator,
-    ));
+    final parts = _extractIntegerPart(text);
+    return TextSpan(style: _style, children: [
+      TextSpan(text: parts[0]),
+      ...separateTextByThousands(
+        text: parts[1],
+        spacerWidth: spacerWidth,
+        separator: separator,
+      ),
+      if (parts[2] != '')
+        TextSpan(text: parts[2]),
+      ],
+    );
   }
 
   final TextStyle composingStyle =
   _style.merge(const TextStyle(decoration: TextDecoration.underline));
+
+  final parts = _extractIntegerPart(value.composing.textInside(value.text));
 
   return TextSpan(
     style: _style,
@@ -76,11 +107,16 @@ TextSpan _buildTextSpan({
       TextSpan(text: value.composing.textBefore(value.text)),
       TextSpan(
         style: composingStyle,
-        children: separateTextByThousands(
-          text: value.composing.textInside(value.text),
-          spacerWidth: spacerWidth,
-          separator: separator,
-        ),
+        children: [
+          TextSpan(text: parts[0]),
+          ...separateTextByThousands(
+            text: parts[1],
+            spacerWidth: spacerWidth,
+            separator: separator,
+          ),
+          if (parts[2] != '')
+            TextSpan(text: parts[2]),
+        ],
       ),
       TextSpan(text: value.composing.textAfter(value.text)),
     ],
@@ -101,6 +137,11 @@ class TextEditingControllerEnhanced extends TextEditingController {
         text: TextSpan(text: separator, style: textFieldStyle), maxLines: 1, textDirection: TextDirection.ltr)
       ..layout(minWidth: 0, maxWidth: double.infinity);
     spacerWidth = textPainter.width;
+  }
+
+  @override
+  String get text {
+    return super.text; //.replaceAll(_zeroWidthCharacter, '');
   }
 
   @override
@@ -344,7 +385,6 @@ TextEditingValue addZeroIfNeed(TextEditingValue value, String delimiter) {
   }
 }
 
-
 TextEditingValue removeExtraLeadingZeros(TextEditingValue value, String delimiter) {
   // 1|000. -> |000. -> 0|.
   // 1|000 -> |000 -> 0|
@@ -388,7 +428,6 @@ TextEditingValue removeExtraLeadingZeros(TextEditingValue value, String delimite
   }
 }
 
-
 class NumberFormatter extends TextInputFormatter {
   final bool integer;
   final bool float;
@@ -396,7 +435,7 @@ class NumberFormatter extends TextInputFormatter {
   final int decimalDigits;
   final bool signed;
   final String delimiter;
-  String allowedChars = '0123456789';
+  String allowedChars = NUMBERS;
 
   NumberFormatter({
     required this.integer,
@@ -415,7 +454,31 @@ class NumberFormatter extends TextInputFormatter {
   }
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    return removeExtraLeadingZeros(addZeroIfNeed(_formatEditUpdateNumber(oldValue, newValue), delimiter), delimiter);
+    final needRemoveZWC = oldValue.text.isNotEmpty && oldValue.text[0] == _zeroWidthCharacter;
+    final _oldValue = TextEditingValue(
+      text: oldValue.text.replaceAll(_zeroWidthCharacter, ''),
+      selection: TextSelection(
+        baseOffset: oldValue.selection.baseOffset - (needRemoveZWC ? 1 : 0),
+        extentOffset: oldValue.selection.extentOffset - (needRemoveZWC ? 1 : 0),
+      ),
+    );
+    final _newValue = TextEditingValue(
+      text: newValue.text.replaceAll(_zeroWidthCharacter, ''),
+      selection: TextSelection(
+        baseOffset: newValue.selection.baseOffset - (needRemoveZWC ? 1 : 0),
+        extentOffset: newValue.selection.extentOffset - (needRemoveZWC ? 1 : 0),
+      ),
+    );
+
+
+    final formattedValue = removeExtraLeadingZeros(addZeroIfNeed(_formatEditUpdateNumber(_oldValue, _newValue), delimiter), delimiter);
+    return TextEditingValue(
+      text: _zeroWidthCharacter + formattedValue.text,
+      selection: TextSelection(
+        baseOffset: formattedValue.selection.baseOffset + 1,
+        extentOffset: formattedValue.selection.extentOffset + 1,
+      ),
+    );
   }
 
   TextEditingValue _formatEditUpdateNumber(TextEditingValue oldValue, TextEditingValue newValue) {
@@ -518,7 +581,12 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
     ) : TextEditingController();
 
     _inputFormatters.addAll(widget.parent.inputFormatters ?? []);
-
+    
+    _inputFormatters.add(TextInputFormatter.withFunction(
+          (oldValue, newValue) => newValue.copyWith(
+        text: newValue.text.replaceAll(' ', ''),
+      ),
+    ));
     if (widget.parent.integer || widget.parent.float || widget.parent.fixedPoint) {
       if (widget.parent.initialZero && _controller.text == '') {
         _controller.text = '0';
