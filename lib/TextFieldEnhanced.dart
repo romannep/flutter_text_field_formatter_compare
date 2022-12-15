@@ -6,11 +6,11 @@ import 'package:flutter/services.dart';
 
 // TODO: floating label with separator
 // TODO: copy/paste
-// TODO: take in account numbers after dot
 // TODO: fix kerning problem
 
 const int _zwjUtf16 = 0x200d;
 final String _zeroWidthCharacter = String.fromCharCode(_zwjUtf16);
+
 List<TextSpan> separateTextByThousands({
   required String text,
   double spacerWidth = 0,
@@ -37,10 +37,6 @@ List<TextSpan> separateTextByThousands({
       spans.add(TextSpan(text: text[i]));
     }
   }
-
-  // If extra letter space added to first character it also
-  // adds space before character - so mirror text does not match.
-  // In this case zero width symbol added as first.
 
   return spans.reversed.toList();
 }
@@ -84,14 +80,14 @@ TextSpan _buildTextSpan({
   if (!value.isComposingRangeValid || !withComposing) {
     final parts = _extractIntegerPart(text);
     return TextSpan(style: _style, children: [
-      TextSpan(text: parts[0]),
-      ...separateTextByThousands(
-        text: parts[1],
-        spacerWidth: spacerWidth,
-        separator: separator,
-      ),
-      if (parts[2] != '')
-        TextSpan(text: parts[2]),
+        TextSpan(text: parts[0]),
+        ...separateTextByThousands(
+          text: parts[1],
+          spacerWidth: spacerWidth,
+          separator: separator,
+        ),
+        if (parts[2] != '')
+          TextSpan(text: parts[2]),
       ],
     );
   }
@@ -140,11 +136,6 @@ class TextEditingControllerEnhanced extends TextEditingController {
   }
 
   @override
-  String get text {
-    return super.text; //.replaceAll(_zeroWidthCharacter, '');
-  }
-
-  @override
   TextSpan buildTextSpan(
       {required BuildContext context,
       TextStyle? style,
@@ -171,6 +162,7 @@ class TextEditingControllerEnhancedMirror extends TextEditingController {
   TextEditingControllerEnhancedMirror({
     required this.textFieldStyle,
     required this.separator,
+    super.text,
   });
 
   @override
@@ -212,7 +204,7 @@ class TextFieldEnhanced extends StatelessWidget {
     this.fixedPoint = false,
     this.decimalDigits = 0,
     this.signed = false,
-    this.initialZero = false,
+    this.initialZero = true,
     // TextField properties
     super.key,
     this.controller,
@@ -454,6 +446,9 @@ class NumberFormatter extends TextInputFormatter {
   }
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    // If extra letter space added to first character it also
+    // adds space before character - so mirror text does not match.
+    // We need to add symbol as first.
     final needRemoveZWC = oldValue.text.isNotEmpty && oldValue.text[0] == _zeroWidthCharacter;
     final _oldValue = TextEditingValue(
       text: oldValue.text.replaceAll(_zeroWidthCharacter, ''),
@@ -554,7 +549,6 @@ class NumberFormatter extends TextInputFormatter {
   }
 }
 
-
 class _TextFieldEnhancedWidget extends StatefulWidget {
   final TextFieldEnhanced parent;
   final TextStyle style;
@@ -574,8 +568,11 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
   final List<TextInputFormatter> _inputFormatters = [];
 
   initState() {
+    final initialText = widget.parent.controller != null ? widget.parent.controller!.text :
+      (widget.parent.initialZero ? _zeroWidthCharacter + '0' : '');
+
     _controller = widget.parent.separateThousands ? TextEditingControllerEnhanced(
-      text: widget.parent.controller != null ? widget.parent.controller!.text : null,
+      text: initialText,
       separator: widget.parent.separator,
       textFieldStyle: widget.style,
     ) : TextEditingController();
@@ -588,9 +585,6 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       ),
     ));
     if (widget.parent.integer || widget.parent.float || widget.parent.fixedPoint) {
-      if (widget.parent.initialZero && _controller.text == '') {
-        _controller.text = '0';
-      }
       _inputFormatters.add(NumberFormatter(
         integer: widget.parent.integer,
         float: widget.parent.float,
@@ -601,10 +595,15 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
     }
 
     _controllerMirror = TextEditingControllerEnhancedMirror(
+      text: initialText,
       textFieldStyle: widget.style,
       separator: widget.parent.separator,
     );
     _controller.addListener(() {
+      print('val text ${_controller.text}');
+      if (_controller.value.selection.baseOffset == 0) {
+        _controller.selection = _controller.value.selection.copyWith(baseOffset: 1);
+      }
       if (widget.parent.controller != null) {
         widget.parent.controller!.value = _controller.value;
       }
