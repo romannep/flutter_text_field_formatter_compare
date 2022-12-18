@@ -7,9 +7,14 @@ import 'package:flutter/services.dart';
 // TODO: floating label with separator
 // TODO: copy/paste
 // TODO: fix kerning problem
+// TODO: sync scroll
 
-const int _zwjUtf16 = 0x200d;
-final String _zeroWidthCharacter = String.fromCharCode(_zwjUtf16);
+// Unlucky with zero width character:
+// - while adjusting baseOffset, <ctrl+A, delete> leaves text[1] symbol
+// const int _zwjUtf16 = 0x200d;
+// final String _zeroWidthCharacter = String.fromCharCode(_zwjUtf16);
+
+final String _zeroWidthCharacter = '|';
 
 List<TextSpan> separateTextByThousands({
   required String text,
@@ -426,6 +431,7 @@ class NumberFormatter extends TextInputFormatter {
   final bool fixedPoint;
   final int decimalDigits;
   final bool signed;
+  final bool separateThousands;
   final String delimiter;
   String allowedChars = NUMBERS;
 
@@ -435,6 +441,7 @@ class NumberFormatter extends TextInputFormatter {
     required this.fixedPoint,
     required this.decimalDigits,
     required this.signed,
+    required this.separateThousands,
     this.delimiter = '.',
   }) {
     if (signed) {
@@ -449,6 +456,8 @@ class NumberFormatter extends TextInputFormatter {
     // If extra letter space added to first character it also
     // adds space before character - so mirror text does not match.
     // We need to add symbol as first.
+    // Can not add it in buildTextSpan, because it will shift
+    // cursor position.
     final needRemoveZWC = oldValue.text.isNotEmpty && oldValue.text[0] == _zeroWidthCharacter;
     final _oldValue = TextEditingValue(
       text: oldValue.text.replaceAll(_zeroWidthCharacter, ''),
@@ -465,8 +474,8 @@ class NumberFormatter extends TextInputFormatter {
       ),
     );
 
-
     final formattedValue = removeExtraLeadingZeros(addZeroIfNeed(_formatEditUpdateNumber(_oldValue, _newValue), delimiter), delimiter);
+
     return TextEditingValue(
       text: _zeroWidthCharacter + formattedValue.text,
       selection: TextSelection(
@@ -591,7 +600,17 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
         fixedPoint: widget.parent.fixedPoint,
         decimalDigits: widget.parent.decimalDigits,
         signed: widget.parent.signed,
+        separateThousands: widget.parent.separateThousands,
       ));
+      if (!widget.parent.separateThousands) {
+        _inputFormatters.add(TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(
+          text: newValue.text.substring(1),
+          selection: TextSelection(
+            baseOffset: newValue.selection.baseOffset - 1,
+            extentOffset: newValue.selection.extentOffset -1
+          ),
+        )));
+      }
     }
 
     _controllerMirror = TextEditingControllerEnhancedMirror(
@@ -599,9 +618,9 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       textFieldStyle: widget.style,
       separator: widget.parent.separator,
     );
+
     _controller.addListener(() {
-      print('val text ${_controller.text}');
-      if (_controller.value.selection.baseOffset == 0) {
+      if (widget.parent.separateThousands && _controller.value.selection.baseOffset == 0 && _controller.text.length > 1) {
         _controller.selection = _controller.value.selection.copyWith(baseOffset: 1);
       }
       if (widget.parent.controller != null) {
@@ -676,11 +695,29 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       return textField;
     }
 
+    InputDecoration? decorationMirror = null;
+
+    if (widget.parent.decoration != null) {
+      final labelStyle = widget.parent.decoration!.labelStyle ?? TextStyle();
+      final floatingLabelStyle = widget.parent.decoration!.floatingLabelStyle ?? TextStyle();
+
+      decorationMirror = widget.parent.decoration!.copyWith(
+        labelStyle: labelStyle.copyWith(
+          color: Color(0x00000000),
+          backgroundColor: Color(0x00000000),
+        ),
+        floatingLabelStyle: floatingLabelStyle.copyWith(
+          color: Color(0x00000000),
+          backgroundColor: Color(0x00000000),
+        ),
+      );
+    }
+
     final textFieldMirror = TextField(
       key: widget.parent.textFieldMirrorKey,
       controller: _controllerMirror,
       focusNode: widget.parent.focusNode,
-      decoration: widget.parent.decoration,
+      decoration: decorationMirror,
       keyboardType: widget.parent.keyboardType,
       textInputAction: widget.parent.textInputAction,
       textCapitalization: widget.parent.textCapitalization,
