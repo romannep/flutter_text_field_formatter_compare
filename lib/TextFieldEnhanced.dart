@@ -8,13 +8,14 @@ import 'package:flutter/services.dart';
 // TODO: copy/paste
 // TODO: fix kerning problem
 // TODO: sync scroll
+// TODO: initial text
 
 // Unlucky with zero width character:
 // - while adjusting baseOffset, <ctrl+A, delete> leaves text[1] symbol
 // const int _zwjUtf16 = 0x200d;
 // final String _zeroWidthCharacter = String.fromCharCode(_zwjUtf16);
 
-final String _zeroWidthCharacter = '|';
+const String _zeroWidthCharacter = '|';
 
 List<TextSpan> separateTextByThousands({
   required String text,
@@ -46,7 +47,7 @@ List<TextSpan> separateTextByThousands({
   return spans.reversed.toList();
 }
 
-const NUMBERS = '0123456789';
+const numbers = '0123456789';
 
 List<String> _extractIntegerPart(String text) {
   final List<String> parts = [_zeroWidthCharacter,'',''];
@@ -59,7 +60,7 @@ List<String> _extractIntegerPart(String text) {
     i++;
   }
   for (; i < text.length; i++) {
-    if (NUMBERS.contains(text[i])) {
+    if (numbers.contains(text[i])) {
       parts[1] += text[i];
     } else {
       break;
@@ -79,13 +80,23 @@ TextSpan _buildTextSpan({
   required String text,
   double spacerWidth = 0,
   String separator = '', // will insert separator instead of space
+  required double zwcWidth,
 }) {
-  final _style = textFieldStyle.merge(style);
+  final effectiveStyle = textFieldStyle.merge(style);
+
+  final zwcStyle = effectiveStyle.merge(TextStyle(
+    color: const Color(0x00000000),
+    backgroundColor: const Color(0x00000000),
+    letterSpacing: text.length > 1 ? -zwcWidth : 0,
+  ));
 
   if (!value.isComposingRangeValid || !withComposing) {
     final parts = _extractIntegerPart(text);
-    return TextSpan(style: _style, children: [
-        TextSpan(text: parts[0]),
+    return TextSpan(style: effectiveStyle, children: [
+        TextSpan(
+          text: parts[0],
+          style: zwcStyle,
+        ),
         ...separateTextByThousands(
           text: parts[1],
           spacerWidth: spacerWidth,
@@ -98,18 +109,21 @@ TextSpan _buildTextSpan({
   }
 
   final TextStyle composingStyle =
-  _style.merge(const TextStyle(decoration: TextDecoration.underline));
+  effectiveStyle.merge(const TextStyle(decoration: TextDecoration.underline));
 
   final parts = _extractIntegerPart(value.composing.textInside(value.text));
 
   return TextSpan(
-    style: _style,
+    style: effectiveStyle,
     children: <TextSpan>[
       TextSpan(text: value.composing.textBefore(value.text)),
       TextSpan(
         style: composingStyle,
         children: [
-          TextSpan(text: parts[0]),
+          TextSpan(
+            text: parts[0],
+            style: zwcStyle,
+          ),
           ...separateTextByThousands(
             text: parts[1],
             spacerWidth: spacerWidth,
@@ -128,11 +142,13 @@ class TextEditingControllerEnhanced extends TextEditingController {
   final String separator;
   final TextStyle textFieldStyle;
   late final double spacerWidth;
+  final double zwcWidth;
 
   TextEditingControllerEnhanced({
     String? text,
     required this.textFieldStyle,
     required this.separator,
+    required this.zwcWidth,
   }) : super(text: text) {
     final TextPainter textPainter = TextPainter(
         text: TextSpan(text: separator, style: textFieldStyle), maxLines: 1, textDirection: TextDirection.ltr)
@@ -156,6 +172,7 @@ class TextEditingControllerEnhanced extends TextEditingController {
       style: style,
       withComposing: withComposing,
       spacerWidth: spacerWidth,
+      zwcWidth: zwcWidth,
     );
   }
 }
@@ -163,10 +180,12 @@ class TextEditingControllerEnhanced extends TextEditingController {
 class TextEditingControllerEnhancedMirror extends TextEditingController {
   final TextStyle textFieldStyle;
   final String separator;
+  final double zwcWidth;
 
   TextEditingControllerEnhancedMirror({
     required this.textFieldStyle,
     required this.separator,
+    required this.zwcWidth,
     super.text,
   });
 
@@ -183,6 +202,7 @@ class TextEditingControllerEnhancedMirror extends TextEditingController {
       style: style,
       withComposing: withComposing,
       separator: separator,
+      zwcWidth: zwcWidth,
     );
   }
 }
@@ -340,11 +360,11 @@ class TextFieldEnhanced extends StatelessWidget {
 }
 
 TextEditingValue addZeroIfNeed(TextEditingValue value, String delimiter) {
-  if (value.text.indexOf(delimiter) == -1) {
+  if (!value.text.contains(delimiter)) {
     if ((value.text.startsWith('-') && value.text.length == 1)
-    || (value.text.length == 0)) {
+    || (value.text.isEmpty)) {
       return TextEditingValue(
-        text: value.text + '0',
+        text: '${value.text}0',
         selection: TextSelection(
           baseOffset: value.selection.baseOffset + 1,
           extentOffset: value.selection.baseOffset + 1,
@@ -358,7 +378,7 @@ TextEditingValue addZeroIfNeed(TextEditingValue value, String delimiter) {
   if (value.text.startsWith('-')) {
     if (value.text[1] == delimiter) {
       return TextEditingValue(
-        text: '-0' + value.text.replaceAll('-', ''),
+        text: '-0${value.text.replaceAll('-', '')}',
         selection: TextSelection(
           baseOffset: value.selection.baseOffset + 1,
           extentOffset: value.selection.baseOffset + 1,
@@ -370,7 +390,7 @@ TextEditingValue addZeroIfNeed(TextEditingValue value, String delimiter) {
   } else {
     if (value.text.startsWith(delimiter)) {
       return TextEditingValue(
-        text: '0' + value.text,
+        text: '0${value.text}',
         selection: TextSelection(
           baseOffset: value.selection.baseOffset + 1,
           extentOffset: value.selection.baseOffset + 1,
@@ -433,7 +453,7 @@ class NumberFormatter extends TextInputFormatter {
   final bool signed;
   final bool separateThousands;
   final String delimiter;
-  String allowedChars = NUMBERS;
+  String allowedChars = numbers;
 
   NumberFormatter({
     required this.integer,
@@ -459,14 +479,14 @@ class NumberFormatter extends TextInputFormatter {
     // Can not add it in buildTextSpan, because it will shift
     // cursor position.
     final needRemoveZWC = oldValue.text.isNotEmpty && oldValue.text[0] == _zeroWidthCharacter;
-    final _oldValue = TextEditingValue(
+    final localOldValue = TextEditingValue(
       text: oldValue.text.replaceAll(_zeroWidthCharacter, ''),
       selection: TextSelection(
         baseOffset: oldValue.selection.baseOffset - (needRemoveZWC ? 1 : 0),
         extentOffset: oldValue.selection.extentOffset - (needRemoveZWC ? 1 : 0),
       ),
     );
-    final _newValue = TextEditingValue(
+    final localNewValue = TextEditingValue(
       text: newValue.text.replaceAll(_zeroWidthCharacter, ''),
       selection: TextSelection(
         baseOffset: newValue.selection.baseOffset - (needRemoveZWC ? 1 : 0),
@@ -474,7 +494,7 @@ class NumberFormatter extends TextInputFormatter {
       ),
     );
 
-    final formattedValue = removeExtraLeadingZeros(addZeroIfNeed(_formatEditUpdateNumber(_oldValue, _newValue), delimiter), delimiter);
+    final formattedValue = removeExtraLeadingZeros(addZeroIfNeed(_formatEditUpdateNumber(localOldValue, localNewValue), delimiter), delimiter);
 
     return TextEditingValue(
       text: _zeroWidthCharacter + formattedValue.text,
@@ -491,7 +511,7 @@ class NumberFormatter extends TextInputFormatter {
       // 1 character inserted
       print('inserted ${newValue.text[newValue.selection.baseOffset - 1]}');
       final insertedChar = newValue.text[newValue.selection.baseOffset - 1];
-      if (allowedChars.indexOf(insertedChar) == -1 ) {
+      if (!allowedChars.contains(insertedChar) ) {
         return oldValue;
       }
 
@@ -580,10 +600,16 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
     final initialText = widget.parent.controller != null ? widget.parent.controller!.text :
       (widget.parent.initialZero ? _zeroWidthCharacter + '0' : '');
 
+    final TextPainter textPainterZwc = TextPainter(
+        text: TextSpan(text: _zeroWidthCharacter, style: widget.style), maxLines: 1, textDirection: TextDirection.ltr)
+      ..layout(minWidth: 0, maxWidth: double.infinity);
+    final zwcWidth = textPainterZwc.width;
+
     _controller = widget.parent.separateThousands ? TextEditingControllerEnhanced(
       text: initialText,
       separator: widget.parent.separator,
       textFieldStyle: widget.style,
+      zwcWidth: zwcWidth,
     ) : TextEditingController();
 
     _inputFormatters.addAll(widget.parent.inputFormatters ?? []);
@@ -617,6 +643,7 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       text: initialText,
       textFieldStyle: widget.style,
       separator: widget.parent.separator,
+      zwcWidth: zwcWidth,
     );
 
     _controller.addListener(() {
@@ -627,6 +654,8 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
         widget.parent.controller!.value = _controller.value;
       }
       _controllerMirror.value = _controller.value;
+      print('mirror offset ${_controllerMirror.selection}');
+
       setState(() {});
     });
     super.initState();
@@ -695,20 +724,20 @@ class _TextFieldEnhancedState extends State<_TextFieldEnhancedWidget> {
       return textField;
     }
 
-    InputDecoration? decorationMirror = null;
+    InputDecoration? decorationMirror;
 
     if (widget.parent.decoration != null) {
-      final labelStyle = widget.parent.decoration!.labelStyle ?? TextStyle();
-      final floatingLabelStyle = widget.parent.decoration!.floatingLabelStyle ?? TextStyle();
+      final labelStyle = widget.parent.decoration!.labelStyle ?? const TextStyle();
+      final floatingLabelStyle = widget.parent.decoration!.floatingLabelStyle ?? const TextStyle();
 
       decorationMirror = widget.parent.decoration!.copyWith(
         labelStyle: labelStyle.copyWith(
-          color: Color(0x00000000),
-          backgroundColor: Color(0x00000000),
+          color: const Color(0x00000000),
+          backgroundColor: const Color(0x00000000),
         ),
         floatingLabelStyle: floatingLabelStyle.copyWith(
-          color: Color(0x00000000),
-          backgroundColor: Color(0x00000000),
+          color: const Color(0x00000000),
+          backgroundColor: const Color(0x00000000),
         ),
       );
     }
